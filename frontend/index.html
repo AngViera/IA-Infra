@@ -3,29 +3,52 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Mancala Kalah – IA Motor</title>
+<title>Mancala Kalah – Motor IA</title>
 <style>
   :root {
-    --bg: #1a1a2e; --card: #16213e; --accent: #e94560;
-    --pit: #0f3460; --pit-h: #533483; --text: #eaeaea;
-    --kalaha: #e94560; --seed: #f5a623;
+    --bg: #1a1a2e;
+    --card: #16213e;
+    --accent: #e94560;
+    --pit: #0f3460;
+    --pit-h: #533483;
+    --text: #eaeaea;
+    --kalaha: #e94560;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif;
-         display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 20px; }
-  h1 { font-size: 1.8rem; margin-bottom: 4px; color: var(--accent); }
-  .subtitle { font-size: 0.85rem; opacity: .7; margin-bottom: 20px; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 20px;
+  }
+  h1 { font-size: 1.7rem; margin-bottom: 4px; color: var(--accent); }
+  .subtitle { font-size: 0.85rem; opacity: .65; margin-bottom: 20px; }
   .board-wrapper { display: flex; align-items: center; gap: 12px; }
-  .kalaha { width: 80px; height: 180px; background: var(--kalaha); border-radius: 40px;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            font-size: 2rem; font-weight: bold; box-shadow: 0 4px 15px rgba(233,69,96,.4); }
+  .kalaha {
+    width: 80px; height: 180px;
+    background: var(--kalaha);
+    border-radius: 40px;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    font-size: 2rem; font-weight: bold;
+    box-shadow: 0 4px 15px rgba(233,69,96,.4);
+  }
   .kalaha .label { font-size: .65rem; opacity: .8; margin-top: 4px; }
   .pits-col { display: flex; flex-direction: column; gap: 8px; }
   .pit {
-    width: 70px; height: 70px; background: var(--pit); border-radius: 50%;
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    cursor: pointer; transition: background .2s, transform .1s;
-    font-size: 1.5rem; font-weight: bold; border: 2px solid transparent;
+    width: 70px; height: 70px;
+    background: var(--pit);
+    border-radius: 50%;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    cursor: pointer;
+    transition: background .2s, transform .1s;
+    font-size: 1.5rem; font-weight: bold;
+    border: 2px solid transparent;
     user-select: none;
   }
   .pit:hover:not(.disabled) { background: var(--pit-h); transform: scale(1.08); }
@@ -33,46 +56,45 @@
   .pit.disabled { opacity: .45; cursor: not-allowed; }
   .pit .idx { font-size: .55rem; opacity: .6; }
   .info-panel { margin-top: 20px; width: 100%; max-width: 600px; }
-  .scores { display: flex; justify-content: space-between; font-size: 1.1rem; margin-bottom: 10px; }
-  .score-box { background: var(--card); padding: 10px 20px; border-radius: 8px; text-align: center; }
-  .score-box span { display: block; font-size: 1.8rem; font-weight: bold; color: var(--accent); }
-  .controls { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+  .status {
+    text-align: center; font-size: 1rem;
+    margin: 8px 0; padding: 8px;
+    border-radius: 6px; background: var(--card);
+  }
+  .controls { display: flex; gap: 10px; flex-wrap: wrap; margin: 10px 0 12px; }
   select, button {
-    background: var(--card); color: var(--text); border: 1px solid #444;
-    padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: .9rem;
+    background: var(--card); color: var(--text);
+    border: 1px solid #444; padding: 8px 14px;
+    border-radius: 6px; cursor: pointer; font-size: .9rem;
   }
   button.primary { background: var(--accent); border-color: var(--accent); font-weight: bold; }
   button:hover { opacity: .85; }
-  .log { background: var(--card); border-radius: 8px; padding: 12px;
-         max-height: 160px; overflow-y: auto; font-size: .78rem; font-family: monospace; }
+  .log {
+    background: var(--card); border-radius: 8px; padding: 12px;
+    max-height: 160px; overflow-y: auto;
+    font-size: .78rem; font-family: monospace;
+  }
   .log .entry { margin-bottom: 4px; }
   .log .entry.ai { color: #6ee7b7; }
   .log .entry.err { color: #f87171; }
-  .status { text-align: center; font-size: 1rem; margin: 8px 0;
-            padding: 8px; border-radius: 6px; background: var(--card); }
 </style>
 </head>
 <body>
 
-<h1>🎲 Mancala Kalah(6,4)</h1>
+<h1>Mancala Kalah(6,4)</h1>
 <p class="subtitle">Minimax + Poda Alfa-Beta con OpenMP – Motor C++</p>
 
 <div class="board-wrapper">
-  <!-- Player 1 kalaha (left side) -->
   <div class="kalaha" id="k1">
     <div id="k1-val">0</div>
     <div class="label">Jugador 1</div>
   </div>
 
-  <!-- Pits grid -->
   <div>
-    <!-- Player 1 pits (top row, reversed) -->
     <div class="pits-col" style="flex-direction:row; justify-content:flex-end; margin-bottom:8px;" id="row-p1"></div>
-    <!-- Player 0 pits (bottom row) -->
     <div class="pits-col" style="flex-direction:row;" id="row-p0"></div>
   </div>
 
-  <!-- Player 0 kalaha (right side) -->
   <div class="kalaha" id="k0">
     <div id="k0-val">0</div>
     <div class="label">Jugador 0</div>
@@ -82,13 +104,13 @@
 <div class="info-panel">
   <div class="status" id="status">Turno: Jugador 0 (Humano)</div>
 
-  <div class="controls" style="margin-top:10px;">
+  <div class="controls">
     <label>Profundidad:
       <select id="depth">
         <option value="4">4</option>
         <option value="6">6</option>
-        <option value="8" selected>8</option>
-        <option value="10">10</option>
+        <option value="7" selected>7</option>
+        <option value="9">9</option>
       </select>
     </label>
     <label>Hilos:
@@ -108,7 +130,7 @@
     <button class="primary" onclick="resetGame()">Nueva partida</button>
   </div>
 
-  <div class="log" id="log"><div class="entry">Bienvenido. Selecciona un hoyo para jugar.</div></div>
+  <div class="log" id="log"><div class="entry">Selecciona un circulo para comenzar.</div></div>
 </div>
 
 <script>
@@ -118,7 +140,7 @@ let board = [];
 let side  = 0;
 let busy  = false;
 let aiVsAi = false;
-let aiVsAiTimer = null;
+let aiTimer = null;
 
 function initBoard() {
   board = [4,4,4,4,4,4,0, 4,4,4,4,4,4,0];
@@ -126,53 +148,56 @@ function initBoard() {
 }
 
 function renderBoard() {
-  // Player 0 pits: indices 0-5
   const rowP0 = document.getElementById('row-p0');
   rowP0.innerHTML = '';
   for (let i = 0; i < 6; i++) {
     const div = document.createElement('div');
     div.className = 'pit' + (side === 0 && board[i] > 0 && !busy ? ' active-hint' : ' disabled');
-    div.innerHTML = `${board[i]}<div class="idx">[${i}]</div>`;
+    div.innerHTML = board[i] + '<div class="idx">[' + i + ']</div>';
     div.onclick = () => humanMove(i);
     rowP0.appendChild(div);
   }
-  // Player 1 pits: indices 12 down to 7 (reversed to mirror board)
+
   const rowP1 = document.getElementById('row-p1');
   rowP1.innerHTML = '';
   for (let i = 12; i >= 7; i--) {
     const div = document.createElement('div');
-    div.className = 'pit' + (side === 1 && board[i] > 0 && !busy && aiVsAi ? ' active-hint' : ' disabled');
-    div.innerHTML = `${board[i]}<div class="idx">[${i}]</div>`;
+    div.className = 'pit disabled';
+    div.innerHTML = board[i] + '<div class="idx">[' + i + ']</div>';
     rowP1.appendChild(div);
   }
+
   document.getElementById('k0-val').textContent = board[6];
   document.getElementById('k1-val').textContent = board[13];
 
-  // Status
-  const terminal = board.slice(0,6).every(v=>v===0) || board.slice(7,13).every(v=>v===0);
+  const terminal = board.slice(0,6).every(v => v === 0) || board.slice(7,13).every(v => v === 0);
   if (terminal) {
     const fin = collectRemaining([...board]);
-    const winner = fin[6] > fin[13] ? 'Jugador 0 🏆' : fin[13] > fin[6] ? 'Jugador 1 🏆' : 'Empate 🤝';
-    document.getElementById('status').textContent = `Juego terminado – ${winner} (${fin[6]} vs ${fin[13]})`;
+    let msg;
+    if (fin[6] > fin[13]) msg = 'Gana Jugador 0 (' + fin[6] + ' vs ' + fin[13] + ')';
+    else if (fin[13] > fin[6]) msg = 'Gana Jugador 1 (' + fin[13] + ' vs ' + fin[6] + ')';
+    else msg = 'Empate (' + fin[6] + ' vs ' + fin[13] + ')';
+    document.getElementById('status').textContent = 'Juego terminado – ' + msg;
     busy = true;
   } else {
     document.getElementById('status').textContent =
-      `Turno: Jugador ${side} ${aiVsAi || side===1 ? '(IA)' : '(Humano)'}`;
+      'Turno: Jugador ' + side + (aiVsAi || side === 1 ? ' (IA)' : ' (Humano)');
   }
 }
 
 function collectRemaining(b) {
-  for (let s = 0; s < 2; s++) {
-    const start = s === 0 ? 0 : 7, k = s === 0 ? 6 : 13;
-    for (let i = start; i < start+6; i++) { b[k] += b[i]; b[i] = 0; }
+  for (let p = 0; p < 2; p++) {
+    const start = p === 0 ? 0 : 7;
+    const k = p === 0 ? 6 : 13;
+    for (let i = start; i < start + 6; i++) { b[k] += b[i]; b[i] = 0; }
   }
   return b;
 }
 
-function log(msg, cls='') {
+function log(msg, cls) {
   const el = document.getElementById('log');
   const d = document.createElement('div');
-  d.className = 'entry ' + cls;
+  d.className = 'entry' + (cls ? ' ' + cls : '');
   d.textContent = msg;
   el.appendChild(d);
   el.scrollTop = el.scrollHeight;
@@ -182,40 +207,45 @@ async function askAI() {
   busy = true;
   const depth   = parseInt(document.getElementById('depth').value);
   const threads = parseInt(document.getElementById('threads').value);
-  log(`IA (Jugador ${side}) pensando… depth=${depth} threads=${threads}`, 'ai');
+  log('IA (Jugador ' + side + ') calculando... depth=' + depth + ' threads=' + threads, 'ai');
   try {
     const resp = await fetch(API, {
       method: 'POST',
-      headers: {'Content-Type':'application/json'},
+      headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({board, side, depth, threads})
     });
-    if (!resp.ok) { log(`Error HTTP ${resp.status}`, 'err'); busy = false; return; }
+    if (!resp.ok) { log('Error HTTP ' + resp.status, 'err'); busy = false; return; }
     const data = await resp.json();
-    log(`IA jugó hoyo ${data.move} | eval=${data.evaluation} | ${data.elapsed_ms}ms | nodos=${data.stats.nodes} | podas=${data.stats.prunes}`, 'ai');
+    log('IA jugo circulito ' + data.move + ' | eval=' + data.evaluation +
+        ' | ' + data.elapsed_ms + 'ms | nodos=' + data.stats.nodes +
+        ' | podas=' + data.stats.prunes, 'ai');
     applyMoveLocal(data.move);
   } catch(e) {
-    log(`Error: ${e.message}`, 'err');
+    log('Error: ' + e.message, 'err');
     busy = false;
   }
 }
 
 function applyMoveLocal(pit) {
-  const skip = side === 0 ? 13 : 6;
-  let seeds = board[pit]; board[pit] = 0;
+  const rivalStore = side === 0 ? 13 : 6;
+  const ownStore   = side === 0 ? 6  : 13;
+  const ownStart   = side === 0 ? 0  : 7;
+  let seeds = board[pit];
+  board[pit] = 0;
   let idx = pit;
   while (seeds > 0) {
     idx = (idx + 1) % 14;
-    if (idx === skip) idx = (idx + 1) % 14;
-    board[idx]++; seeds--;
+    if (idx === rivalStore) idx = (idx + 1) % 14;
+    board[idx]++;
+    seeds--;
   }
-  const ownKalaha = side === 0 ? 6 : 13;
-  if (idx !== ownKalaha) {
-    const ownStart = side === 0 ? 0 : 7;
-    if (idx >= ownStart && idx < ownStart+6 && board[idx] === 1) {
+  if (idx !== ownStore) {
+    if (idx >= ownStart && idx < ownStart + 6 && board[idx] === 1) {
       const opp = 12 - idx;
       if (board[opp] > 0) {
-        board[ownKalaha] += board[opp] + 1;
-        board[idx] = 0; board[opp] = 0;
+        board[ownStore] += board[opp] + 1;
+        board[idx] = 0;
+        board[opp] = 0;
       }
     }
     side = 1 - side;
@@ -226,32 +256,31 @@ function applyMoveLocal(pit) {
 }
 
 function scheduleNextMove() {
-  const terminal = board.slice(0,6).every(v=>v===0) || board.slice(7,13).every(v=>v===0);
+  const terminal = board.slice(0,6).every(v => v === 0) || board.slice(7,13).every(v => v === 0);
   if (terminal) return;
   if (aiVsAi || side === 1) {
-    aiVsAiTimer = setTimeout(askAI, 600);
+    aiTimer = setTimeout(askAI, 700);
   }
 }
 
 function humanMove(pit) {
   if (busy || side !== 0 || aiVsAi) return;
-  if (board[pit] === 0) { log('Hoyo vacío, elige otro.', 'err'); return; }
-  log(`Humano jugó hoyo ${pit}`);
+  if (board[pit] === 0) { log('circulo vacio, elige otro.', 'err'); return; }
+  log('Humano jugo circulito ' + pit);
   applyMoveLocal(pit);
 }
 
 function resetGame() {
-  clearTimeout(aiVsAiTimer);
-  busy = false;
+  clearTimeout(aiTimer);
+  busy   = false;
   aiVsAi = document.getElementById('mode').value === 'ai-ai';
   initBoard();
   document.getElementById('log').innerHTML = '';
-  log('Nueva partida.');
+  log('Nueva partida iniciada.');
   renderBoard();
   if (aiVsAi) scheduleNextMove();
 }
 
-// Init
 initBoard();
 aiVsAi = document.getElementById('mode').value === 'ai-ai';
 renderBoard();

@@ -95,8 +95,8 @@ int main(int argc, char* argv[]) {
             // recompute eval for response
             SearchStats tmp;
             Board child = board.apply(best_move);
-            bool cm = (child.side == board.side);
-            eval_val = alphabeta(child, depth-1, -INF, INF, cm, board.side, tmp);
+            bool cm = (child.turn == board.turn);
+            eval_val = alphabeta(child, depth-1, -INF, INF, cm, board.turn, tmp);
         } else {
             auto result = alphabeta_parallel(board, depth, threads, st);
             best_move = result.move;

@@ -3,126 +3,115 @@
 #include <vector>
 #include <stdexcept>
 
-// Board layout (14 ints, canonical):
-//  [0..5]  = Player-0 pits (left→right)
-//  [6]     = Player-0 kalaha (store)
-//  [7..12] = Player-1 pits  (right→left from Player-0 perspective)
-//  [13]    = Player-1 kalaha (store)
-//
-// Anticlockwise order: 0→1→2→3→4→5→6→7→8→9→10→11→12→(skip 13 for P0)→0
-//                      7→8→9→10→11→12→13→0→1→2→3→4→5→(skip 6 for P1)→7
-//
-// Opposite pits: pit i (0-5) ↔ pit (12-i), e.g. 0↔12, 5↔7
+// Tablero de 14 posiciones:
+// [0..5]  = hoyos del Jugador 0
+// [6]     = kalaha del Jugador 0
+// [7..12] = hoyos del Jugador 1
+// [13]    = kalaha del Jugador 1
+// El hoyo opuesto de i (0-5) es (12-i)
 
-static constexpr int NUM_PITS   = 14;
-static constexpr int KALAHA_P0  = 6;
-static constexpr int KALAHA_P1  = 13;
-static constexpr int SIDE_SIZE  = 6;
+static constexpr int TOTAL_SLOTS  = 14;
+static constexpr int STORE_P0     = 6;
+static constexpr int STORE_P1     = 13;
+static constexpr int PITS_PER_SIDE = 6;
 
 struct Board {
-    std::array<int, NUM_PITS> pits{};
-    int side{0};   // 0 = Player 0's turn, 1 = Player 1's turn
+    std::array<int, TOTAL_SLOTS> pits{};
+    int turn{0};  // 0 = turno del Jugador 0, 1 = turno del Jugador 1
 
-    // Standard Kalah(6,4) starting position
     static Board initial() {
         Board b;
         b.pits.fill(4);
-        b.pits[KALAHA_P0] = 0;
-        b.pits[KALAHA_P1] = 0;
-        b.side = 0;
+        b.pits[STORE_P0] = 0;
+        b.pits[STORE_P1] = 0;
+        b.turn = 0;
         return b;
     }
 
-    // Construct from raw array
-    static Board from_array(const std::array<int,14>& arr, int s) {
+    static Board from_array(const std::array<int,14>& arr, int t) {
         Board b;
         b.pits = arr;
-        b.side = s;
+        b.turn = t;
         return b;
     }
 
-    int kalaha(int s) const { return s == 0 ? KALAHA_P0 : KALAHA_P1; }
-    int pit_start(int s)   const { return s == 0 ? 0 : 7; }
+    int store(int player) const { return player == 0 ? STORE_P0 : STORE_P1; }
+    int first_pit(int player) const { return player == 0 ? 0 : 7; }
 
-    // Sum of seeds on player s's side (excluding kalaha)
-    int seeds_on_side(int s) const {
-        int start = pit_start(s), total = 0;
-        for (int i = start; i < start + SIDE_SIZE; i++) total += pits[i];
+    int seeds_on_side(int player) const {
+        int start = first_pit(player), total = 0;
+        for (int i = start; i < start + PITS_PER_SIDE; i++)
+            total += pits[i];
         return total;
     }
 
-    // Legal moves for current player (pits with seeds > 0)
     std::vector<int> legal_moves() const {
         std::vector<int> moves;
-        int start = pit_start(side);
-        for (int i = start; i < start + SIDE_SIZE; i++)
+        int start = first_pit(turn);
+        for (int i = start; i < start + PITS_PER_SIDE; i++)
             if (pits[i] > 0) moves.push_back(i);
         return moves;
     }
 
-    // Apply move; returns resulting board (side updated)
     Board apply(int pit) const {
         if (pits[pit] == 0)
-            throw std::runtime_error("Empty pit selected");
+            throw std::runtime_error("Hoyo vacio");
 
         Board next = *this;
         int seeds = next.pits[pit];
         next.pits[pit] = 0;
 
-        int skip = (side == 0) ? KALAHA_P1 : KALAHA_P0;
+        // El kalaha del rival se omite durante la siembra
+        int rival_store = (turn == 0) ? STORE_P1 : STORE_P0;
         int idx = pit;
 
         while (seeds > 0) {
-            idx = (idx + 1) % NUM_PITS;
-            if (idx == skip) idx = (idx + 1) % NUM_PITS;
+            idx = (idx + 1) % TOTAL_SLOTS;
+            if (idx == rival_store)
+                idx = (idx + 1) % TOTAL_SLOTS;
             next.pits[idx]++;
             seeds--;
         }
 
-        // Extra turn: last seed in own kalaha
-        if (idx == kalaha(side)) {
-            // side stays the same
+        // Turno extra si la ultima semilla cayo en el propio kalaha
+        if (idx == store(turn))
             return next;
-        }
 
-        // Capture: last seed in empty own pit, opposite has seeds
-        int own_start = pit_start(side);
-        bool is_own_pit = (idx >= own_start && idx < own_start + SIDE_SIZE);
-        if (is_own_pit && next.pits[idx] == 1) {
-            int opp = 12 - idx;  // opposite pit index
+        // Captura si la ultima semilla cayo en un hoyo propio que estaba vacio
+        int start = first_pit(turn);
+        bool is_own = (idx >= start && idx < start + PITS_PER_SIDE);
+        if (is_own && next.pits[idx] == 1) {
+            int opp = 12 - idx;
             if (next.pits[opp] > 0) {
-                next.pits[kalaha(side)] += next.pits[opp] + 1;
+                next.pits[store(turn)] += next.pits[opp] + 1;
                 next.pits[idx] = 0;
                 next.pits[opp] = 0;
             }
         }
 
-        next.side = 1 - side;
+        next.turn = 1 - turn;
         return next;
     }
 
-    // Terminal: one side is empty
     bool is_terminal() const {
         return seeds_on_side(0) == 0 || seeds_on_side(1) == 0;
     }
 
-    // Collect remaining seeds into respective kalahas (call when terminal)
     Board collect_remaining() const {
         Board b = *this;
-        for (int s = 0; s < 2; s++) {
-            int start = pit_start(s);
-            for (int i = start; i < start + SIDE_SIZE; i++) {
-                b.pits[kalaha(s)] += b.pits[i];
+        for (int p = 0; p < 2; p++) {
+            int start = first_pit(p);
+            for (int i = start; i < start + PITS_PER_SIDE; i++) {
+                b.pits[store(p)] += b.pits[i];
                 b.pits[i] = 0;
             }
         }
         return b;
     }
 
-    // Winner: 0 = P0 wins, 1 = P1 wins, -1 = draw (only valid after collect_remaining)
     int winner() const {
-        if (pits[KALAHA_P0] > pits[KALAHA_P1]) return 0;
-        if (pits[KALAHA_P1] > pits[KALAHA_P0]) return 1;
+        if (pits[STORE_P0] > pits[STORE_P1]) return 0;
+        if (pits[STORE_P1] > pits[STORE_P0]) return 1;
         return -1;
     }
 };

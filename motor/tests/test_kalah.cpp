@@ -12,7 +12,7 @@ TEST_CASE("Initial board is Kalah(6,4)") {
     CHECK(b.pits[6] == 0);
     for (int i = 7; i < 13; i++) CHECK(b.pits[i] == 4);
     CHECK(b.pits[13] == 0);
-    CHECK(b.side == 0);
+    CHECK(b.turn == 0);
     CHECK(b.seeds_on_side(0) == 24);
     CHECK(b.seeds_on_side(1) == 24);
 }
@@ -36,7 +36,7 @@ TEST_CASE("Sowing pit 2 from initial distributes 4 seeds") {
     CHECK(b.pits[6] == 1);   // kalaha P0 gets 1
     // Opponent side unchanged
     for (int i = 7; i < 13; i++) CHECK(b.pits[i] == 4);
-    CHECK(b.side == 1);      // turn passes to player 1
+    CHECK(b.turn == 1);      // turn passes to player 1
 }
 
 TEST_CASE("Sowing skips opponent kalaha") {
@@ -56,7 +56,7 @@ TEST_CASE("Last seed in own kalaha gives extra turn") {
     Board b = Board::from_array(arr, 0);
     Board next = b.apply(5);
     CHECK(next.pits[6] == 1);
-    CHECK(next.side == 0);   // still player 0's turn
+    CHECK(next.turn == 0);   // still player 0's turn
 }
 
 // ─── Capture ────────────────────────────────────────────────────────────────
@@ -123,8 +123,8 @@ TEST_CASE("collect_remaining moves all seeds to kalahas") {
     Board fin = b.collect_remaining();
     CHECK(fin.seeds_on_side(0) == 0);
     CHECK(fin.seeds_on_side(1) == 0);
-    CHECK(fin.pits[KALAHA_P0] == 24);
-    CHECK(fin.pits[KALAHA_P1] == 2+3+1+0+2+4);
+    CHECK(fin.pits[STORE_P0] == 24);
+    CHECK(fin.pits[STORE_P1] == 2+3+1+0+2+4);
 }
 
 // ─── Alpha-Beta == Minimax (correctness) ────────────────────────────────────
