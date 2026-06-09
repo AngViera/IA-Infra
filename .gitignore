@@ -1,0 +1,55 @@
+# Build artifacts
+build/
+cmake-build/
+cmake-build-*/
+*.o
+*.a
+*.so
+mancala_server
+mancala_bench
+test_kalah
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.coverage
+coverage.xml
+*.egg-info/
+dist/
+htmlcov/
+
+# Docker
+.docker/
+
+# Node (if any)
+node_modules/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# CMake
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+compile_commands.json
+_deps/
+
+# Compiled LaTeX (if any)
+*.pdf
+*.log
+*.aux
+_minted*/
+
+# Sonar
+.sonar/
+.scannerwork/

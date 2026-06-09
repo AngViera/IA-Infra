@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mancala-config
+  namespace: default
+data:
+  OMP_NUM_THREADS: "4"
+  DEFAULT_DEPTH: "8"
+  MOTOR_URL: "http://motor-svc:8080"
+  ALLOWED_ORIGINS: "http://localhost:8090,http://frontend-svc"

@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mancala-config
+  namespace: mancala
+data:
+  OMP_NUM_THREADS: "2"
+  DEFAULT_DEPTH: "8"
+  MOTOR_URL: "http://motor-svc:8080"
+  # Update ALLOWED_ORIGINS after you know the frontend LoadBalancer IP/domain
+  ALLOWED_ORIGINS: "http://FRONTEND_EXTERNAL_IP"

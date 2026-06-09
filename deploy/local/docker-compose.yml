@@ -1,0 +1,60 @@
+version: "3.9"
+
+services:
+
+  # ── Motor C++/OpenMP ────────────────────────────────────────────────────────
+  motor:
+    build: ../../motor
+    image: mancala-motor:local
+    container_name: motor
+    restart: unless-stopped
+    environment:
+      OMP_NUM_THREADS: "4"
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # ── Backend Python / FastAPI ────────────────────────────────────────────────
+  backend:
+    build: ../../backend
+    image: mancala-backend:local
+    container_name: backend
+    restart: unless-stopped
+    depends_on:
+      motor:
+        condition: service_healthy
+    environment:
+      MOTOR_URL: "http://motor:8080"
+      ALLOWED_ORIGINS: "http://localhost:8090"
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz')"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # ── Frontend nginx ──────────────────────────────────────────────────────────
+  frontend:
+    build: ../../frontend
+    image: mancala-frontend:local
+    container_name: frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      # Injected at runtime by nginx; the JS reads window.API_URL
+      API_URL: "http://localhost:8000"
+    ports:
+      - "8090:80"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3

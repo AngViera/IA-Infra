@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mancala Kalah – Minimax & Alfa-Beta</title>
+<style>
+:root {
+  --bg:#0f1117; --card:#1a1d27; --card2:#222636; --accent:#6c63ff;
+  --p0:#f5a623; --p1:#4ecdc4; --empty:#2a2d3e; --text:#e8eaf0; --muted:#8b8fa8;
+  --green:#3dd68c; --red:#ff6b6b; --border:#2e3248;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;
+     min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:20px 12px}
+h1{font-size:1.6rem;font-weight:600;margin-bottom:2px;
+   background:linear-gradient(135deg,var(--accent),var(--p1));-webkit-background-clip:text;
+   -webkit-text-fill-color:transparent;background-clip:text}
+.subtitle{font-size:.8rem;color:var(--muted);margin-bottom:18px;text-align:center}
+
+/* ── BOARD ─────────────────────────────────────────────── */
+.board-wrap{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.kalaha{width:72px;height:160px;border-radius:36px;display:flex;flex-direction:column;
+        align-items:center;justify-content:center;font-size:2rem;font-weight:700;
+        border:2px solid var(--border);background:var(--card)}
+.kalaha.k0{border-color:var(--p0);box-shadow:0 0 18px rgba(245,166,35,.25)}
+.kalaha.k1{border-color:var(--p1);box-shadow:0 0 18px rgba(78,205,196,.25)}
+.kalaha .lbl{font-size:.6rem;color:var(--muted);margin-top:3px;font-weight:400}
+.rows{display:flex;flex-direction:column;gap:8px}
+.row{display:flex;gap:8px}
+.pit{width:64px;height:64px;border-radius:50%;display:flex;flex-direction:column;
+     align-items:center;justify-content:center;font-size:1.4rem;font-weight:700;
+     cursor:pointer;border:2px solid var(--border);background:var(--empty);
+     transition:all .15s;user-select:none;position:relative}
+.pit .pidx{font-size:.5rem;color:var(--muted);position:absolute;bottom:5px}
+.pit.p0{border-color:var(--p0);background:rgba(245,166,35,.08)}
+.pit.p0:hover:not(.dead){background:rgba(245,166,35,.22);transform:scale(1.07)}
+.pit.p1{border-color:var(--p1);background:rgba(78,205,196,.06)}
+.pit.p1:hover:not(.dead){background:rgba(78,205,196,.18);transform:scale(1.07)}
+.pit.dead{opacity:.4;cursor:default}
+.pit.hint{box-shadow:0 0 0 3px var(--p0)}
+
+/* ── STATUS ─────────────────────────────────────────────── */
+.status{text-align:center;padding:8px 18px;border-radius:8px;background:var(--card);
+        font-size:.9rem;margin-bottom:12px;min-width:320px;border:1px solid var(--border)}
+.status.ai-turn{border-color:var(--p1);color:var(--p1)}
+.status.win{border-color:var(--green);color:var(--green);font-weight:600;font-size:1rem}
+.status.draw{border-color:var(--muted);color:var(--muted)}
+
+/* ── CONTROLS ───────────────────────────────────────────── */
+.controls{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:14px}
+select,button{background:var(--card2);color:var(--text);border:1px solid var(--border);
+              padding:7px 13px;border-radius:7px;cursor:pointer;font-size:.82rem}
+select:focus,button:focus{outline:none;border-color:var(--accent)}
+button.primary{background:var(--accent);border-color:var(--accent);font-weight:600}
+button:hover{opacity:.85}
+label{display:flex;align-items:center;gap:6px;font-size:.82rem;color:var(--muted)}
+label select{padding:5px 10px}
+
+/* ── STATS ──────────────────────────────────────────────── */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;
+            width:100%;max-width:560px;margin-bottom:14px}
+.stat-box{background:var(--card);border:1px solid var(--border);border-radius:10px;
+          padding:10px 8px;text-align:center}
+.stat-box .val{font-size:1.3rem;font-weight:700;color:var(--accent)}
+.stat-box .lbl{font-size:.62rem;color:var(--muted);margin-top:2px}
+.stat-box.green .val{color:var(--green)}
+.stat-box.orange .val{color:var(--p0)}
+.stat-box.teal .val{color:var(--p1)}
+
+/* ── COMPARISON TABLE ───────────────────────────────────── */
+.compare{width:100%;max-width:560px;background:var(--card);border:1px solid var(--border);
+         border-radius:12px;padding:14px;margin-bottom:14px}
+.compare h3{font-size:.85rem;font-weight:600;margin-bottom:10px;color:var(--muted);
+            letter-spacing:.05em;text-transform:uppercase}
+.compare table{width:100%;border-collapse:collapse;font-size:.78rem}
+.compare th{color:var(--muted);text-align:left;padding:4px 8px;border-bottom:1px solid var(--border)}
+.compare td{padding:5px 8px;border-bottom:1px solid rgba(255,255,255,.04)}
+.compare tr:last-child td{border-bottom:none}
+.badge{display:inline-block;padding:2px 7px;border-radius:4px;font-size:.7rem;font-weight:600}
+.badge.mm{background:rgba(245,166,35,.2);color:var(--p0)}
+.badge.ab{background:rgba(108,99,255,.2);color:var(--accent)}
+
+/* ── LOG ────────────────────────────────────────────────── */
+.log{width:100%;max-width:560px;background:var(--card);border:1px solid var(--border);
+     border-radius:10px;padding:10px 14px;max-height:120px;overflow-y:auto}
+.log .entry{font-size:.74rem;font-family:'Consolas',monospace;padding:2px 0;
+            border-bottom:1px solid rgba(255,255,255,.03)}
+.log .entry.ai{color:var(--p1)}
+.log .entry.err{color:var(--red)}
+.log .entry.win{color:var(--green);font-weight:600}
+
+/* ── THINKING SPINNER ───────────────────────────────────── */
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinner{display:inline-block;width:12px;height:12px;border:2px solid var(--p1);
+         border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;
+         vertical-align:middle;margin-right:6px}
+</style>
+</head>
+<body>
+
+<h1>🎲 Mancala Kalah(6,4)</h1>
+<p class="subtitle">Demostración de Minimax con Poda Alfa–Beta · Infraestructuras Paralelas y Distribuidas</p>
+
+<!-- Board -->
+<div class="board-wrap">
+  <div class="kalaha k1" id="k1"><div id="k1v">0</div><div class="lbl">Jugador 1</div></div>
+  <div class="rows">
+    <div class="row" id="row1"></div><!-- P1 top -->
+    <div class="row" id="row0"></div><!-- P0 bottom -->
+  </div>
+  <div class="kalaha k0" id="k0"><div id="k0v">0</div><div class="lbl">Jugador 0</div></div>
+</div>
+
+<!-- Status -->
+<div class="status" id="status">Turno: Jugador 0 (Humano)</div>
+
+<!-- Controls -->
+<div class="controls">
+  <label>Algoritmo:
+    <select id="algo">
+      <option value="ab" selected>Alfa-Beta (poda)</option>
+      <option value="mm">Minimax puro</option>
+      <option value="both">Comparar ambos</option>
+    </select>
+  </label>
+  <label>Profundidad:
+    <select id="depth">
+      <option value="3">3</option>
+      <option value="4">4</option>
+      <option value="5">5</option>
+      <option value="6" selected>6</option>
+      <option value="7">7</option>
+      <option value="8">8</option>
+    </select>
+  </label>
+  <label>Modo:
+    <select id="mode">
+      <option value="human-ai">Humano vs IA</option>
+      <option value="ai-ai">IA vs IA</option>
+      <option value="human-human">Humano vs Humano</option>
+    </select>
+  </label>
+  <button class="primary" onclick="resetGame()">Nueva partida</button>
+</div>
+
+<!-- Stats boxes -->
+<div class="stats-grid">
+  <div class="stat-box"><div class="val" id="s-nodes">0</div><div class="lbl">Nodos explorados</div></div>
+  <div class="stat-box green"><div class="val" id="s-prunes">0</div><div class="lbl">Podas Alfa-Beta</div></div>
+  <div class="stat-box orange"><div class="val" id="s-time">0ms</div><div class="lbl">Tiempo búsqueda</div></div>
+  <div class="stat-box teal"><div class="val" id="s-move">-</div><div class="lbl">Movimiento elegido</div></div>
+</div>
+
+<!-- Comparison table (shown in "both" mode) -->
+<div class="compare" id="cmp-table" style="display:none">
+  <h3>Comparación de algoritmos (última jugada)</h3>
+  <table>
+    <thead><tr><th>Algoritmo</th><th>Nodos</th><th>Podas</th><th>Tiempo</th><th>Movimiento</th></tr></thead>
+    <tbody id="cmp-body"><tr><td colspan="5" style="color:var(--muted);text-align:center">—</td></tr></tbody>
+  </table>
+</div>
+
+<!-- Log -->
+<div class="log" id="log"><div class="entry">Bienvenido. Haz clic en un hoyo para jugar.</div></div>
+
+<script>
+// ─── Constantes ─────────────────────────────────────────────────────────────
+const K0 = 6, K1 = 13, AW = 0.1;
+
+// ─── Lógica del tablero ──────────────────────────────────────────────────────
+function initBoard(){ return [4,4,4,4,4,4,0,4,4,4,4,4,4,0]; }
+function kalaha(s){ return s===0?K0:K1; }
+function pitStart(s){ return s===0?0:7; }
+function seedsSide(b,s){ let t=0,st=pitStart(s); for(let i=st;i<st+6;i++) t+=b[i]; return t; }
+function legalMoves(b,s){ const m=[],st=pitStart(s); for(let i=st;i<st+6;i++) if(b[i]>0) m.push(i); return m; }
+function terminal(b){ return seedsSide(b,0)===0||seedsSide(b,1)===0; }
+
+function applyMove(b, s, pit){
+  const nb=[...b];
+  const skip=s===0?K1:K0;
+  let seeds=nb[pit]; nb[pit]=0;
+  let idx=pit;
+  while(seeds>0){ idx=(idx+1)%14; if(idx===skip) idx=(idx+1)%14; nb[idx]++; seeds--; }
+  if(idx===kalaha(s)) return [nb,s];               // turno extra
+  const st=pitStart(s);
+  if(idx>=st&&idx<st+6&&nb[idx]===1){              // captura
+    const opp=12-idx;
+    if(nb[opp]>0){ nb[kalaha(s)]+=nb[opp]+1; nb[idx]=0; nb[opp]=0; }
+  }
+  return [nb,1-s];
+}
+
+function collectRem(b){
+  const nb=[...b];
+  for(let s=0;s<2;s++){ const st=pitStart(s),k=kalaha(s); for(let i=st;i<st+6;i++){nb[k]+=nb[i];nb[i]=0;} }
+  return nb;
+}
+
+function evaluate(b, maxS){
+  return (b[kalaha(maxS)]-b[kalaha(1-maxS)])+Math.round(AW*100*(seedsSide(b,maxS)-seedsSide(b,1-maxS)));
+}
+function termEval(b,maxS){ const f=collectRem(b); return f[kalaha(maxS)]-f[kalaha(1-maxS)]; }
+
+// ─── Minimax puro ────────────────────────────────────────────────────────────
+function minimax(b,s,d,isMax,maxS,st){
+  st.nodes++;
+  if(d===0||terminal(b)) return terminal(b)?termEval(b,maxS):evaluate(b,maxS);
+  const mv=legalMoves(b,s); if(!mv.length) return evaluate(b,maxS);
+  if(isMax){
+    let v=-Infinity;
+    for(const m of mv){ const[nb,ns]=applyMove(b,s,m); v=Math.max(v,minimax(nb,ns,d-1,ns===maxS,maxS,st)); }
+    return v;
+  } else {
+    let v=Infinity;
+    for(const m of mv){ const[nb,ns]=applyMove(b,s,m); v=Math.min(v,minimax(nb,ns,d-1,ns===maxS,maxS,st)); }
+    return v;
+  }
+}
+function bestMM(b,s,d){
+  const st={nodes:0,prunes:0}, mv=legalMoves(b,s);
+  let bv=-Infinity,bm=mv[0];
+  for(const m of mv){ const[nb,ns]=applyMove(b,s,m); const v=minimax(nb,ns,d-1,ns===s,s,st); if(v>bv){bv=v;bm=m;} }
+  return {move:bm,eval:bv,nodes:st.nodes,prunes:0};
+}
+
+// ─── Alfa-Beta ───────────────────────────────────────────────────────────────
+function alphabeta(b,s,d,alpha,beta,isMax,maxS,st){
+  st.nodes++;
+  if(d===0||terminal(b)) return terminal(b)?termEval(b,maxS):evaluate(b,maxS);
+  const mv=legalMoves(b,s); if(!mv.length) return evaluate(b,maxS);
+  if(isMax){
+    let v=-Infinity;
+    for(const m of mv){
+      const[nb,ns]=applyMove(b,s,m);
+      v=Math.max(v,alphabeta(nb,ns,d-1,alpha,beta,ns===maxS,maxS,st));
+      alpha=Math.max(alpha,v);
+      if(beta<=alpha){st.prunes++;break;}
+    }
+    return v;
+  } else {
+    let v=Infinity;
+    for(const m of mv){
+      const[nb,ns]=applyMove(b,s,m);
+      v=Math.min(v,alphabeta(nb,ns,d-1,alpha,beta,ns===maxS,maxS,st));
+      beta=Math.min(beta,v);
+      if(beta<=alpha){st.prunes++;break;}
+    }
+    return v;
+  }
+}
+function bestAB(b,s,d){
+  const st={nodes:0,prunes:0}, mv=legalMoves(b,s);
+  let bv=-Infinity,bm=mv[0],alpha=-Infinity;
+  for(const m of mv){
+    const[nb,ns]=applyMove(b,s,m);
+    const v=alphabeta(nb,ns,d-1,alpha,Infinity,ns===s,s,st);
+    if(v>bv){bv=v;bm=m;} alpha=Math.max(alpha,bv);
+  }
+  return {move:bm,eval:bv,nodes:st.nodes,prunes:st.prunes};
+}
+
+// ─── Estado del juego ────────────────────────────────────────────────────────
+let board=initBoard(), side=0, busy=false, aiTimer=null;
+
+function getAlgo(){ return document.getElementById('algo').value; }
+function getDepth(){ return parseInt(document.getElementById('depth').value); }
+function getMode(){ return document.getElementById('mode').value; }
+
+// ─── Render ──────────────────────────────────────────────────────────────────
+function render(){
+  document.getElementById('k0v').textContent=board[K0];
+  document.getElementById('k1v').textContent=board[K1];
+
+  // P1 top row: pits 12,11,10,9,8,7
+  const r1=document.getElementById('row1'); r1.innerHTML='';
+  for(let i=12;i>=7;i--){
+    const d=document.createElement('div');
+    const active=side===1&&board[i]>0&&!busy;
+    d.className='pit p1'+(active?'':' dead');
+    d.innerHTML=`${board[i]}<span class="pidx">[${i}]</span>`;
+    r1.appendChild(d);
+  }
+
+  // P0 bottom row: pits 0,1,2,3,4,5
+  const r0=document.getElementById('row0'); r0.innerHTML='';
+  for(let i=0;i<6;i++){
+    const d=document.createElement('div');
+    const active=side===0&&board[i]>0&&!busy&&getMode()!=='ai-ai';
+    d.className='pit p0'+(active?' hint':' dead');
+    d.innerHTML=`${board[i]}<span class="pidx">[${i}]</span>`;
+    if(active) d.onclick=()=>humanPlay(i);
+    r0.appendChild(d);
+  }
+
+  // Status
+  const st=document.getElementById('status');
+  if(terminal(board)){
+    const fin=collectRem([...board]);
+    const w=fin[K0]>fin[K1]?'Jugador 0 🏆':fin[K1]>fin[K0]?'Jugador 1 🏆':'¡Empate 🤝!';
+    st.className='status win';
+    st.textContent=`Juego terminado – ${w}  (${fin[K0]} – ${fin[K1]})`;
+    busy=true; return;
+  }
+  const isAITurn = getMode()==='ai-ai'||(getMode()==='human-ai'&&side===1);
+  st.className='status'+(isAITurn?' ai-turn':'');
+  st.innerHTML=isAITurn?`<span class="spinner"></span>Jugador ${side} (IA) pensando…`
+                       :`Turno: Jugador ${side} ${getMode()==='human-human'?'(Humano)':'(Humano)'}`;
+  if(!isAITurn) st.className='status';
+}
+
+// ─── Log ─────────────────────────────────────────────────────────────────────
+function addLog(msg,cls=''){
+  const l=document.getElementById('log');
+  const d=document.createElement('div'); d.className='entry '+cls; d.textContent=msg;
+  l.appendChild(d); l.scrollTop=l.scrollHeight;
+}
+
+// ─── Stats display ────────────────────────────────────────────────────────────
+function showStats(res, algo){
+  document.getElementById('s-nodes').textContent=res.nodes.toLocaleString();
+  document.getElementById('s-prunes').textContent=res.prunes.toLocaleString();
+  document.getElementById('s-time').textContent=res.time+'ms';
+  document.getElementById('s-move').textContent='Hoyo '+res.move;
+}
+
+function showCompare(abRes, mmRes, depth){
+  const tbl=document.getElementById('cmp-table');
+  tbl.style.display='block';
+  const saving=mmRes.nodes>0?Math.round((1-abRes.nodes/mmRes.nodes)*100):0;
+  document.getElementById('cmp-body').innerHTML=`
+    <tr>
+      <td><span class="badge ab">Alfa-Beta</span></td>
+      <td>${abRes.nodes.toLocaleString()}</td>
+      <td>${abRes.prunes.toLocaleString()}</td>
+      <td>${abRes.time}ms</td>
+      <td>Hoyo ${abRes.move}</td>
+    </tr>
+    <tr>
+      <td><span class="badge mm">Minimax</span></td>
+      <td>${mmRes.nodes.toLocaleString()}</td>
+      <td>—</td>
+      <td>${mmRes.time}ms</td>
+      <td>Hoyo ${mmRes.move}</td>
+    </tr>
+    <tr style="background:rgba(108,99,255,.06)">
+      <td colspan="2" style="color:var(--accent);font-weight:600">
+        Alfa-Beta exploró ${saving}% menos nodos
+      </td>
+      <td colspan="2" style="color:var(--green)">
+        Mismo movimiento: ${abRes.move===mmRes.move?'✓ Sí':'✗ No'}
+      </td>
+      <td></td>
+    </tr>`;
+}
+
+// ─── IA jugada ────────────────────────────────────────────────────────────────
+function aiPlay(){
+  if(terminal(board)||busy) return;
+  busy=true; render();
+  const d=getDepth(), algo=getAlgo();
+
+  // Usar setTimeout para que el spinner aparezca antes de bloquear el hilo
+  setTimeout(()=>{
+    let res, mmRes;
+
+    if(algo==='ab'||algo==='both'){
+      const t0=performance.now();
+      res=bestAB(board,side,d);
+      res.time=Math.round(performance.now()-t0);
+    }
+
+    if(algo==='mm'){
+      const t0=performance.now();
+      res=bestMM(board,side,d);
+      res.time=Math.round(performance.now()-t0);
+    }
+
+    if(algo==='both'){
+      const t0=performance.now();
+      mmRes=bestMM(board,side,d);
+      mmRes.time=Math.round(performance.now()-t0);
+      showCompare(res,mmRes,d);
+    } else {
+      document.getElementById('cmp-table').style.display='none';
+    }
+
+    showStats(res, algo);
+    const prunePct=res.nodes>0?Math.round(res.prunes/res.nodes*100):0;
+    addLog(`IA J${side} → hoyo ${res.move} | eval=${res.eval} | nodos=${res.nodes.toLocaleString()} | podas=${res.prunes} (${prunePct}%) | ${res.time}ms`,'ai');
+
+    doMove(res.move);
+  }, 30);
+}
+
+// ─── Aplicar movimiento y pasar turno ─────────────────────────────────────────
+function doMove(pit){
+  const[nb,ns]=applyMove(board,side,pit);
+  board=nb; side=ns; busy=false;
+  render();
+  if(!terminal(board)) scheduleNext();
+}
+
+function humanPlay(pit){
+  if(busy||side!==0||getMode()==='ai-ai') return;
+  if(board[pit]===0){addLog('Hoyo vacío.','err');return;}
+  addLog(`Humano J0 → hoyo ${pit}`);
+  doMove(pit);
+}
+
+function scheduleNext(){
+  const isAI=getMode()==='ai-ai'||(getMode()==='human-ai'&&side===1);
+  if(isAI) aiTimer=setTimeout(aiPlay,400);
+}
+
+// ─── Reset ────────────────────────────────────────────────────────────────────
+function resetGame(){
+  clearTimeout(aiTimer); busy=false;
+  board=initBoard(); side=0;
+  document.getElementById('log').innerHTML='';
+  document.getElementById('cmp-table').style.display='none';
+  ['s-nodes','s-prunes'].forEach(id=>document.getElementById(id).textContent='0');
+  document.getElementById('s-time').textContent='0ms';
+  document.getElementById('s-move').textContent='-';
+  addLog('Nueva partida. depth='+getDepth()+' algo='+getAlgo());
+  render();
+  if(getMode()==='ai-ai') scheduleNext();
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+render();
+addLog('Listo. Elige un hoyo (fila inferior = Jugador 0).');
+</script>
+</body>
+</html>

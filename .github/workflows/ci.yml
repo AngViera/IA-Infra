@@ -1,0 +1,156 @@
+name: CI/CD – Mancala Kalah
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository_owner }}/mancala
+
+jobs:
+  # ── 1. Build & test C++ motor ──────────────────────────────────────────────
+  build-motor:
+    name: Build & Test Motor (C++/OpenMP)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake g++ libgomp-dev curl
+
+      - name: Configure (CMake)
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release motor/
+
+        working-directory: ${{ github.workspace }}
+
+      - name: Build
+        run: cmake --build build --parallel $(nproc)
+
+      - name: Run unit tests
+        run: |
+          cd build
+          ctest --output-on-failure
+
+      - name: Run benchmark (sanity check, depth=6)
+        run: |
+          cd build
+          OMP_NUM_THREADS=1 ./mancala_bench \
+            --positions ${{ github.workspace }}/motor/bench/suite.txt \
+            --depth 6 --threads 1
+
+  # ── 2. Test Python backend ─────────────────────────────────────────────────
+  test-backend:
+    name: Test Backend (Python/FastAPI)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt pytest pytest-asyncio httpx
+
+      - name: Run tests
+        run: |
+          cd backend
+          pytest tests/ -v --tb=short
+
+      - name: Generate coverage report
+        run: |
+          pip install pytest-cov
+          cd backend
+          pytest tests/ --cov=app --cov-report=xml:coverage.xml || true
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend/coverage.xml
+
+  # ── 3. SonarCloud analysis ─────────────────────────────────────────────────
+  sonarcloud:
+    name: SonarCloud Analysis
+    runs-on: ubuntu-22.04
+    needs: [build-motor, test-backend]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # Required for SonarCloud blame info
+
+      - name: Download backend coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend/
+
+      - name: SonarQube Scan
+        uses: sonarsource/sonarqube-scan-action@v2
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        with:
+          args: >
+            -Dsonar.projectKey=mancala-kalah
+            -Dsonar.projectName=mancala-kalah
+            -Dsonar.sources=motor/src,backend/app
+            -Dsonar.tests=motor/tests,backend/tests
+            -Dsonar.python.coverage.reportPaths=backend/coverage.xml
+            -Dsonar.c.file.suffixes=.cpp,.h
+            -Dsonar.cfamily.compile-commands=build/compile_commands.json
+
+  # ── 4. Build & push Docker images ─────────────────────────────────────────
+  docker:
+    name: Build & Push Docker Images
+    runs-on: ubuntu-22.04
+    needs: [build-motor, test-backend]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set image tag (short SHA)
+        run: echo "TAG=${GITHUB_SHA::8}" >> $GITHUB_ENV
+
+      - name: Build & push motor image
+        uses: docker/build-push-action@v5
+        with:
+          context: motor/
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-motor:${{ env.TAG }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-motor:v1.0.0
+
+      - name: Build & push backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: backend/
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-backend:${{ env.TAG }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-backend:v1.0.0
+
+      - name: Build & push frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: frontend/
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-frontend:${{ env.TAG }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-frontend:v1.0.0
